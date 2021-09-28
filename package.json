@@ -1,0 +1,41 @@
+{
+  "name": "bareuvu",
+  "version": "0.0.0-1",
+  "description": "Automated testing structure; inspired by uvu and baretest modules",
+  "license": "MIT",
+  "author": "Shane Holloway <shane.holloway@ieee.org>",
+  "homepage": "https://github.com/shanewholloway/js-bareuvu#readme",
+  "bugs": {
+    "url": "https://github.com/shanewholloway/js-bareuvu/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shanewholloway/js-bareuvu.git"
+  },
+  "files": [
+    "code/",
+    "esm/"
+  ],
+  "type": "module",
+  "module": "./esm/index.mjs",
+  "exports": {
+    "./esm/*": "./esm/*",
+    ".": "./esm/index.mjs"
+  },
+  "workspaces": [
+    "test"
+  ],
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^13.0.5",
+    "rollup": "^2.57.0",
+    "uvu": "^0.5.1"
+  },
+  "scripts": {
+    "clean": "rm -rf ./esm/*",
+    "prebuild": "test -d ./node_modules || npm ci",
+    "build": "rollup --config",
+    "watch": "rollup --config --watch",
+    "pretest": "npm -s run build",
+    "test": "true"
+  }
+}
