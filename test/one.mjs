@@ -26,8 +26,8 @@ tsts_inner.test('inside-outside', async (ctx) => {
   await new Promise(y => setTimeout(y,4))
   assert.ok(true, 'workeded') })
 
-tst_outer.test('error', ()=> {
-  assert.ok(!false, 'fake problems') })
+tst_outer.test.skip('error', ()=> {
+  assert.ok(false, 'fake problems') })
 
 tst_outer.run_main(basic_rptr, {process})
 

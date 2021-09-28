@@ -36,6 +36,7 @@
     "build": "rollup --config",
     "watch": "rollup --config --watch",
     "pretest": "npm -s run build",
-    "test": "true"
+    "test": "node ./test/one.mjs",
+    "prepublish": "npm test"
   }
 }
