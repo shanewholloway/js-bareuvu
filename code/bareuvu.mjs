@@ -62,7 +62,10 @@ function _bareuvu(_suite_status, headline, ...fn_defines) {
 
     if (_suites[0]) {
       suite_rptr.step(rptr_token, 'suites', headline)
-      await _invoke_suites(_suites, suite_rptr)
+      if (suite_rptr.allow_parallel)
+        await _suites_parallel(_suites, suite_rptr)
+      else
+        await _suites_serial(_suites, suite_rptr)
     }
 
     suite_rptr.end(rptr_token, headline)
@@ -109,11 +112,15 @@ function _bareuvu(_suite_status, headline, ...fn_defines) {
   }
 
 
-  async function _invoke_suites(_suites, suite_rptr) {
+  async function _suites_serial(_suites, suite_rptr) {
+    for (let rec of _suites)
+      await rec.suite.run(suite_rptr)
+  }
+
+  async function _suites_parallel(_suites, suite_rptr) {
     let deps = []
-    for (let rec of _suites) {
+    for (let rec of _suites)
       deps.push(rec.suite.run(suite_rptr))
-    }
 
     // process sub-suites in parallel
     while (0 !== deps.length)

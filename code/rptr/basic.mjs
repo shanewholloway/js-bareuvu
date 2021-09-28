@@ -1,11 +1,13 @@
 export default {
+  allow_parallel: false,
+
   declare_suite(headline, kind) {
     (this.suites || []).push({headline, kind})
     return {__proto__: this, tests: [], suites: []} },
 
   begin(headline) { console.log('') },
   end(token, headline) { console.log('') },
-  info(token, section, headline) {
+  step(token, section, headline) {
     if ('tests' === section)
       console.log(`Section: "${headline}" [${section}]\n`)
   },
