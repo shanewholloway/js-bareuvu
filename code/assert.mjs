@@ -1,3 +1,6 @@
+// Forked under MIT from [uvu/assert](https://github.com/lukeed/uvu/blob/63be84b2355fa4db67b325f869e58416e0ba1069/src/assert.js
+// to remove dependencies on diffing, ANSI coloring, and other larger utilities
+
 import { dequal } from 'dequal';
 
 export class Assertion extends Error {

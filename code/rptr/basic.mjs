@@ -5,6 +5,12 @@ export default {
     (this.suites || []).push({headline, kind})
     return {__proto__: this, tests: [], suites: []} },
 
+  begin_main() { console.log('') },
+  end_main(res, opt) {
+    console.log(res)
+    if (opt.process)
+      opt.process.exit(res.ok ? 0 : 1)
+  },
   begin(headline) { console.log('') },
   end(token, headline) { console.log('') },
   step(token, section, headline) {
@@ -19,12 +25,12 @@ export default {
     return {__proto__: this, ans} },
 
   format_pass(name, ts1) {
-    return { ok: true, msg: `test: ${name} passed (${ts1.toFixed(3)}s)`} },
+    return { ok: true, msg: `${name} (${(.001*ts1).toFixed(3)}s)`} },
 
   format_error(name, err) {
-    return {ok: false, msg: `test: ${name} failed: ${err}`} },
+    return {ok: false, msg: `${name} -- ${err}`} },
 
   test_result(name, kind, result, ts) {
-    console.log(`  Test[${(ts[0]).toFixed(3)}s]: "${name}" -- ${result.msg}`)
+    console.log(`  Test[${result.ok ? 'pass' : 'FAIL'} ${(.001*ts[0]).toFixed(3)}s]: ${result.msg}`)
     this.ans.result = result },
 }

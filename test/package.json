@@ -1,8 +1,0 @@
-{
-  "private": true,
-  "version": "0.0.1",
-  "dependencies": {
-    "bareuvu": "file:.."
-  },
-  "scripts": {}
-}
