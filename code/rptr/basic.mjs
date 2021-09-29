@@ -9,7 +9,7 @@ export default {
   end_main(res, opt) {
     console.log(res)
     if (opt.process)
-      opt.process.exit(res.ok ? 0 : 1)
+      opt.process.exit(res.fail ? 1 : 0)
   },
   begin(headline) { console.log('') },
   end(token, headline) { console.log('') },

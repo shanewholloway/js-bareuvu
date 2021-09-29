@@ -22,16 +22,16 @@ function _bareuvu(_shared, headline, ...fn_defines) {
     rptr = rptr.declare_suite(headline, suite_kind)
     let rptr_token = rptr.begin(headline)
 
-    summary.suites++
     if (is_only || 'suite' === suite_kind) {
       // if this suite or any test is selected
+      summary.suites++
       rptr.step(rptr_token, 'tests', headline)
-      await _shared._suite_tests(_state.coll, sel_kind, rptr, summary, _invoke_test)
+      await _suite_tests(sel_kind, rptr, summary)
     }
 
     if (_state.suites[0]) {
       rptr.step(rptr_token, 'suites', headline)
-      await _shared._subsuites(_state.suites, rptr, summary)
+      await _subsuites(rptr, summary)
     }
 
     rptr.end(rptr_token, headline)
@@ -68,6 +68,28 @@ function _bareuvu(_shared, headline, ...fn_defines) {
     ts[0] = Date.now() - ts[0]
     await test_rptr.test_result(name, kind, result, ts)
   }
+
+  async function _suite_tests(sel_kind, rptr, summary) {
+    let dep = Promise.resolve()
+    for (let rec of _state.coll) {
+      let selected = sel_kind === rec.kind
+      let test_rptr = rptr.declare_test(rec.name, rec.kind, selected)
+      if (selected)
+        dep = _invoke_test(rec, dep, test_rptr, summary)
+      else summary.skip++
+    }
+    await dep
+  }
+
+  async function _subsuites(rptr, summary) {
+    if (rptr.allow_parallel)
+      await Promise.all(
+        _state.suites.map(
+          rec => rec.suite.run(rptr, summary) ))
+    else
+      for (let rec of _state.suites)
+        await rec.suite.run(rptr, summary)
+  }
 }
 
 
@@ -81,7 +103,6 @@ const _suite_api_ = {
   async run_main(rptr, opt={}) {
     rptr.begin_main(opt)
     let res = await this.run(rptr)
-    res.ok = 0 === res.fail
     rptr.end_main(res, opt)
     return res
   },
@@ -126,29 +147,6 @@ class _bareuvu_shared_ {
 
         _suites.push({headline, kind, suite})
         return suite })
-  }
-
-
-  async _suite_tests(test_coll, sel_kind, rptr, summary, _invoke_test) {
-    let dep = Promise.resolve()
-    for (let rec of test_coll) {
-      let selected = sel_kind === rec.kind
-      let test_rptr = rptr.declare_test(rec.name, rec.kind, selected)
-      if (selected)
-        dep = _invoke_test(rec, dep, test_rptr, summary)
-      else summary.skip++
-    }
-    await dep
-  }
-
-  async _subsuites(suites, rptr, summary) {
-    if (rptr.allow_parallel)
-      await Promise.all(
-        suites.map(
-          rec => rec.suite.run(rptr, summary) ))
-    else
-      for (let rec of suites)
-        await rec.suite.run(rptr, summary)
   }
 }
 
