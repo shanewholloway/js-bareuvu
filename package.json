@@ -1,6 +1,6 @@
 {
   "name": "bareuvu",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Automated testing structure; inspired by uvu and baretest modules",
   "license": "MIT",
   "author": "Shane Holloway <shane.holloway@ieee.org>",
