@@ -1,63 +1,23 @@
 export function bareuvu(headline, ...fn_defines) {
-  return _bareuvu(new Map(), headline, ...fn_defines) }
+  return _bareuvu(new _bareuvu_shared_(), headline, ...fn_defines) }
 
 export default bareuvu
 
 
-function _bareuvu(_suite_status, headline, ...fn_defines) {
-  let self, _coll=[], _before=[], _after=[], _suites=[], base_ctx = {};
-
-  {
-    let as_fns = lst => lst.push.bind(lst)
-    let as_test = kind => (name, fn, ...args) => _coll.push({name, kind, fn, args})
-    let as_suite = kind =>
-      (headline, ...args) => {
-        let suite = _bareuvu(_suite_status, headline, ...args)
-        _suites.push({headline, kind, suite})
-        _suite_status.set(suite, kind)
-        if ('only' === kind)
-          _suite_status.is_only = true
-        return suite }
-
-    let ns = {
-      run, run_main,
-      test: as_test('test'),
-      only: as_test('only'),
-      skip: as_test('skip'),
-      before: as_fns(_before),
-      after: as_fns(_after),
-
-      base_ctx,
-      with_ctx: opt => (Object.assign(base_ctx, opt), self),
-
-      suite: Object.assign(
-        as_suite('suite'),
-        { only: as_suite('only'),
-          skip: as_suite('skip') })
-    }
-    self = Object.assign(ns.test, ns)
-
-    _suite_status.set(self, 'suite')
-  }
+function _bareuvu(_shared, headline, ...fn_defines) {
+  let _state = {coll:[], before: [], after:[], suites:[]}
+  let self = _shared.bind_suite(_state, {run})
 
   for (let fn_def of fn_defines)
     fn_def(self)
 
   return self
 
-  async function run_main(rptr, opt={}) {
-    rptr.begin_main(opt)
-    let res = await run(rptr)
-    res.ok = 0 === res.fail
-    rptr.end_main(res, opt)
-    return res
-  }
-
   async function run(rptr, summary={pass:0, fail:0, skip:0, suites:0}) {
     // "only" mode for any tests in collection?
-    let suite_kind = _suite_status.get(self)
-    let sel_kind = _coll.some(e => 'only' === e.kind) ? 'only' : 'test'
-    let is_only = _suite_status.is_only && ('only' === sel_kind || 'only' === suite_kind)
+    let suite_kind = _shared.status.get(self)
+    let sel_kind = _state.coll.some(e => 'only' === e.kind) ? 'only' : 'test'
+    let is_only = _shared.status.is_only && ('only' === sel_kind || 'only' === suite_kind)
 
     rptr = rptr.declare_suite(headline, suite_kind)
     let rptr_token = rptr.begin(headline)
@@ -66,15 +26,12 @@ function _bareuvu(_suite_status, headline, ...fn_defines) {
     if (is_only || 'suite' === suite_kind) {
       // if this suite or any test is selected
       rptr.step(rptr_token, 'tests', headline)
-      await _invoke_test_coll(_coll, sel_kind, rptr, summary)
+      await _shared._suite_tests(_state.coll, sel_kind, rptr, summary, _invoke_test)
     }
 
-    if (_suites[0]) {
+    if (_state.suites[0]) {
       rptr.step(rptr_token, 'suites', headline)
-      if (rptr.allow_parallel)
-        await _suites_parallel(_suites, rptr, summary)
-      else
-        await _suites_serial(_suites, rptr, summary)
+      await _shared._subsuites(_state.suites, rptr, summary)
     }
 
     rptr.end(rptr_token, headline)
@@ -82,25 +39,13 @@ function _bareuvu(_suite_status, headline, ...fn_defines) {
   }
 
 
-  async function _invoke_test_coll(_coll, sel_kind, rptr, summary) {
-    let dep = Promise.resolve()
-    for (let rec of _coll) {
-      let test_rptr = rptr.declare_test(rec.name, rec.kind)
-      if (sel_kind === rec.kind)
-        dep = _invoke_test(rec, dep, test_rptr, summary)
-      else summary.skip++
-    }
-    await dep
-  }
-
-
   async function _invoke_test({name, kind, fn, args}, dep, test_rptr, summary) {
     await dep
 
-    let ctx={__proto__: base_ctx, name, args}
+    let ctx={__proto__: self.base_ctx, name, args}
     let result, ts=[Date.now()]
     try {
-      for (let before_fn of _before)
+      for (let before_fn of _state.before)
         await before_fn(ctx)
 
       ts[1] = Date.now()
@@ -116,29 +61,94 @@ function _bareuvu(_suite_status, headline, ...fn_defines) {
       result = test_rptr.format_error(name, err)
 
     } finally {
-      for (let after_fn of _after)
+      for (let after_fn of _state.after)
         await after_fn(ctx)
     }
 
     ts[0] = Date.now() - ts[0]
     await test_rptr.test_result(name, kind, result, ts)
   }
+}
 
 
-  async function _suites_serial(_suites, rptr, summary) {
-    for (let rec of _suites)
-      await rec.suite.run(rptr, summary)
+const _suite_api_ = {
+  base_ctx: {},
+  with_ctx(opt) {
+    this.base_ctx = {... this.base_ctx, ... opt}
+    return this
+  },
+
+  async run_main(rptr, opt={}) {
+    rptr.begin_main(opt)
+    let res = await this.run(rptr)
+    res.ok = 0 === res.fail
+    rptr.end_main(res, opt)
+    return res
+  },
+}
+
+
+class _bareuvu_shared_ {
+  constructor() { this.status = new Map() }
+
+  bind_suite(_state, api) {
+    let suite = this.as_test_api('test',
+      this.as_test_fn(_state.coll))
+
+    this.status.set(suite, 'suite')
+
+    return Object.assign(suite,
+      _suite_api_, api,
+      { before: this.as_fns(_state.before),
+        after: this.as_fns(_state.after),
+        suite: this.as_add_suite(_state.suites)})
   }
 
-  async function _suites_parallel(_suites, rptr, summary) {
-    let deps = []
-    for (let rec of _suites)
-      deps.push(
-        rec.suite.run(rptr, summary))
+  as_fns(lst) { return lst.push.bind(lst)}
+  as_test_fn(_coll) {
+    return kind => (name, fn, ...args) =>
+      _coll.push({name, kind, fn, args}) }
 
-    // process sub-suites in parallel
-    while (0 !== deps.length)
-      await deps.pop()
+  as_test_api(kind, fn) {
+    let r = fn(kind)
+    r[kind] = r
+    r.only = fn('only')
+    r.skip = fn('skip')
+    return r }
+
+  as_add_suite(_suites) {
+    return this.as_test_api('suite',
+      kind => (headline, ...args) => {
+        let suite = _bareuvu(this, headline, ...args)
+        this.status.set(suite, kind)
+        if ('only' === kind)
+          this.status.is_only = true
+
+        _suites.push({headline, kind, suite})
+        return suite })
+  }
+
+
+  async _suite_tests(test_coll, sel_kind, rptr, summary, _invoke_test) {
+    let dep = Promise.resolve()
+    for (let rec of test_coll) {
+      let selected = sel_kind === rec.kind
+      let test_rptr = rptr.declare_test(rec.name, rec.kind, selected)
+      if (selected)
+        dep = _invoke_test(rec, dep, test_rptr, summary)
+      else summary.skip++
+    }
+    await dep
+  }
+
+  async _subsuites(suites, rptr, summary) {
+    if (rptr.allow_parallel)
+      await Promise.all(
+        suites.map(
+          rec => rec.suite.run(rptr, summary) ))
+    else
+      for (let rec of suites)
+        await rec.suite.run(rptr, summary)
   }
 }
 
