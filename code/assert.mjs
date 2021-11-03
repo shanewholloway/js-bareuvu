@@ -43,6 +43,7 @@ export const is = /* #__PURE__ */ Object.assign(is_ok, {
 })
 
 export function equal(val, exp, msg) {
+  if (!msg) msg = `value: ${val}, expect: ${exp}`
 	assert(dequal(val, exp), val, exp, 'equal', null, 'Expected values to be deeply equal:', msg);
 }
 
@@ -105,6 +106,7 @@ function not_ok(val, msg) {
 export const not = /* #__PURE__ */ Object.assign(not_ok, {
   ok: not_ok,
   equal(val, exp, msg) {
+    if (!msg) msg = `value: ${val}, expect: ${exp}`
     assert(!dequal(val, exp), val, exp, 'not.equal', false, 'Expected values not to be deeply equal', msg);
   },
 

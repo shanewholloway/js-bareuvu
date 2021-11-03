@@ -1,15 +1,15 @@
 export function bareuvu(headline, ...fn_defines) {
-  return _bareuvu(new _bareuvu_shared_(), headline, ...fn_defines) }
+  return _bareuvu(new _bareuvu_shared_(), {}, headline, ...fn_defines) }
 
 export default bareuvu
 
 
-function _bareuvu(_shared, headline, ...fn_defines) {
+function _bareuvu(_shared, base_ctx, headline, ...fn_defines) {
   let _state = {coll:[], before: [], after:[], suites:[]}
-  let self = _shared.bind_suite(_state, {run})
+  let self = _shared.bind_suite(_state, {base_ctx, run})
 
   for (let fn_def of fn_defines)
-    fn_def(self)
+    fn_def(self, self.base_ctx)
 
   return self
 
@@ -17,24 +17,36 @@ function _bareuvu(_shared, headline, ...fn_defines) {
     // "only" mode for any tests in collection?
     let suite_kind = _shared.status.get(self)
     let sel_kind = _state.coll.some(e => 'only' === e.kind) ? 'only' : 'test'
-    let is_only = _shared.status.is_only && ('only' === sel_kind || 'only' === suite_kind)
 
-    rptr = rptr.declare_suite(headline, suite_kind)
-    let rptr_token = rptr.begin(headline)
+    let info = {
+      headline, kind: suite_kind,
+      is_only: _shared.status.is_only,
+      n_tests: _state.coll.length,
+      n_suites: _state.suites.length, }
 
-    if (is_only || 'suite' === suite_kind) {
+    info.run = (0<info.n_tests) && (
+      info.is_only
+        ? ('only' === sel_kind || 'only' === suite_kind)
+        : ('suite' === suite_kind))
+
+    rptr = rptr.declare_suite(info)
+    let rptr_token = rptr.begin(info)
+
+    if (info.run) {
       // if this suite or any test is selected
       summary.suites++
-      rptr.step(rptr_token, 'tests', headline)
+      rptr.step(rptr_token, 'tests', info)
       await _suite_tests(sel_kind, rptr, summary)
+      rptr.step_end(rptr_token, 'tests', info)
     }
 
-    if (_state.suites[0]) {
-      rptr.step(rptr_token, 'suites', headline)
+    if (0 < _state.suites.length) {
+      rptr.step(rptr_token, 'suites', info)
       await _subsuites(rptr, summary)
+      rptr.step_end(rptr_token, 'suites', info)
     }
 
-    rptr.end(rptr_token, headline)
+    rptr.end(rptr_token, info)
     return summary
   }
 
@@ -46,11 +58,11 @@ function _bareuvu(_shared, headline, ...fn_defines) {
     let result, ts=[Date.now()]
     try {
       for (let before_fn of _state.before)
-        await before_fn(ctx)
+        await before_fn(ctx, ctx)
 
       ts[1] = Date.now()
 
-      await fn(ctx)
+      await fn(ctx, ctx)
 
       ts[1] = Date.now() - ts[1]
       summary.pass++
@@ -62,7 +74,7 @@ function _bareuvu(_shared, headline, ...fn_defines) {
 
     } finally {
       for (let after_fn of _state.after)
-        await after_fn(ctx)
+        await after_fn(ctx, ctx)
     }
 
     ts[0] = Date.now() - ts[0]
@@ -94,7 +106,7 @@ function _bareuvu(_shared, headline, ...fn_defines) {
 
 
 const _suite_api_ = {
-  base_ctx: {},
+  //base_ctx: {},
   with_ctx(opt) {
     this.base_ctx = {... this.base_ctx, ... opt}
     return this
@@ -122,25 +134,34 @@ class _bareuvu_shared_ {
       _suite_api_, api,
       { before: this.as_fns(_state.before),
         after: this.as_fns(_state.after),
-        suite: this.as_add_suite(_state.suites)})
+        suite: this.as_add_suite(_state.suites, suite)})
   }
 
   as_fns(lst) { return lst.push.bind(lst)}
   as_test_fn(_coll) {
-    return kind => (name, fn, ...args) =>
-      _coll.push({name, kind, fn, args}) }
+    return (kind, parent) => (name, fn, ...args) => {
+      _coll.push({name, kind, fn, args})
+      if ('only' === kind) {
+        this.status.set(parent, kind)
+        this.status.is_only = true
+      }
+    }
+  }
 
   as_test_api(kind, fn) {
     let r = fn(kind)
     r[kind] = r
-    r.only = fn('only')
-    r.skip = fn('skip')
+    r.only = fn('only', r)
+    r.skip = fn('skip', r)
     return r }
 
-  as_add_suite(_suites) {
+  as_add_suite(_suites, parent) {
     return this.as_test_api('suite',
       kind => (headline, ...args) => {
-        let suite = _bareuvu(this, headline, ...args)
+        if ('skip' === kind)
+          args = [] // no sub suites
+
+        let suite = _bareuvu(this, {... parent.base_ctx}, headline, ...args)
         this.status.set(suite, kind)
         if ('only' === kind)
           this.status.is_only = true
