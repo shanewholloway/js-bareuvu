@@ -84,7 +84,7 @@ export async function async_throws(blk, exp, msg) {
 		await blk();
 		assert(false, false, true, 'async_throws', false, 'Expected function to throw', msg);
 	} catch (err) {
-    exception(_err, exp, msg);
+    exception(err, exp, msg);
   }
 }
 export function throws(blk, exp, msg) {
@@ -92,7 +92,7 @@ export function throws(blk, exp, msg) {
 		blk();
 		assert(false, false, true, 'throws', false, 'Expected function to throw', msg);
 	} catch (err) {
-    exception(_err, exp, msg);
+    exception(err, exp, msg);
   }
 }
 
