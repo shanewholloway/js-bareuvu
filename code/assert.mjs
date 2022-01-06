@@ -79,23 +79,35 @@ export function fixture(val, exp, msg) {
 	assert(val === exp, val, exp, 'fixture', mini_line_compare, 'Expected value to match fixture:', msg);
 }
 
+export async function async_throws(blk, exp, msg) {
+	try {
+		await blk();
+		assert(false, false, true, 'async_throws', false, 'Expected function to throw', msg);
+	} catch (err) {
+    exception(_err, exp, msg);
+  }
+}
 export function throws(blk, exp, msg) {
-	if (!msg && typeof exp === 'string') {
-		msg = exp; exp = null;
-	}
-
 	try {
 		blk();
 		assert(false, false, true, 'throws', false, 'Expected function to throw', msg);
 	} catch (err) {
-		if (err instanceof Assertion) throw err;
+    exception(_err, exp, msg);
+  }
+}
 
-		if (typeof exp === 'function') {
-			assert(exp(err), false, true, 'throws', false, 'Expected function to throw matching exception', msg);
-		} else if (exp instanceof RegExp) {
-			assert(exp.test(err.message), false, true, 'throws', false, `Expected function to throw exception matching \`${String(exp)}\` pattern`, msg);
-		}
+export function exception(err, exp, msg) {
+  if (err instanceof Assertion) throw err;
+
+	if (!msg && typeof exp === 'string') {
+		msg = exp; exp = null;
 	}
+
+  if (typeof exp === 'function') {
+    assert(exp(err), false, true, 'throws', false, 'Expected function to throw matching exception', msg);
+  } else if (exp instanceof RegExp) {
+    assert(exp.test(err.message), false, true, 'throws', false, `Expected function to throw exception matching \`${String(exp)}\` pattern`, msg);
+  }
 }
 
 // ---
@@ -138,21 +150,32 @@ export const not = /* #__PURE__ */ Object.assign(not_ok, {
     }
   },
 
+  async async_throws(blk, exp, msg) {
+    try {
+      await blk();
+    } catch (err) {
+      not.exception(err, exp, msg);
+    }
+  },
+
   throws(blk, exp, msg) {
+    try {
+      blk();
+    } catch (err) {
+      not.exception(err, exp, msg);
+    }
+  },
+  exception(err, exp, msg) {
     if (!msg && typeof exp === 'string') {
       msg = exp; exp = null;
     }
 
-    try {
-      blk();
-    } catch (err) {
-      if (typeof exp === 'function') {
-        assert(!exp(err), true, false, 'not.throws', false, 'Expected function not to throw matching exception', msg);
-      } else if (exp instanceof RegExp) {
-        assert(!exp.test(err.message), true, false, 'not.throws', false, `Expected function not to throw exception matching \`${String(exp)}\` pattern`, msg);
-      } else if (!exp) {
-        assert(false, true, false, 'not.throws', false, 'Expected function not to throw', msg);
-      }
+    if (typeof exp === 'function') {
+      assert(!exp(err), true, false, 'not.throws', false, 'Expected function not to throw matching exception', msg);
+    } else if (exp instanceof RegExp) {
+      assert(!exp.test(err.message), true, false, 'not.throws', false, `Expected function not to throw exception matching \`${String(exp)}\` pattern`, msg);
+    } else if (!exp) {
+      assert(false, true, false, 'not.throws', false, 'Expected function not to throw', msg);
     }
   }
 });
